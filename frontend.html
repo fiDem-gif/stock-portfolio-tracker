@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Stock Portfolio Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body { 
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(120deg, #a1c4fd, #c2e9fb);
+      color: #333;
+      overflow-x: hidden;
+    }
+    .container { 
+      max-width: 900px; 
+      margin: 40px auto;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    }
+    h1, h2 { 
+      text-align: center;
+      margin: 10px 0;
+    }
+    h1 {
+      font-size: 2.5em;
+      color: #444;
+    }
+    h2 {
+      font-size: 1.5em;
+      color: #555;
+    }
+    .input-section, .portfolio-section {
+      margin-bottom: 20px; 
+      padding: 20px; 
+      background: #fff; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    }
+    .input-section input, .input-section button { 
+      margin: 10px 5px 10px 0; 
+      padding: 10px 15px; 
+      border: 1px solid #ddd; 
+      border-radius: 5px;
+      outline: none;
+      transition: box-shadow 0.3s, border 0.3s;
+      font-size: 1em;
+    }
+    .input-section input:focus {
+      border-color: #7a9cc6;
+      box-shadow: 0 0 5px rgba(122, 156, 198, 0.5);
+    }
+    .input-section button {
+      background: #7a9cc6;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+    .input-section button:hover {
+      background: #6482af;
+    }
+    .stock-card { 
+      padding: 15px; 
+      margin: 15px 0; 
+      background: #fafafa; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      animation: fadeIn 0.5s ease-out;
+      transition: transform 0.3s;
+    }
+    .stock-card:hover {
+      transform: translateY(-5px);
+    }
+    .stock-card h3 {
+      margin-top: 0;
+      color: #555;
+    }
+    .remove-btn { 
+      background: #ff4d4d; 
+      color: #fff; 
+      border: none; 
+      padding: 8px 12px; 
+      cursor: pointer;
+      border-radius: 5px;
+      transition: transform 0.3s, background 0.3s;
+      font-weight: 600;
+    }
+    .remove-btn:hover {
+      transform: scale(1.05);
+      background: #e04343;
+    }
+    .chart-container { 
+      width: 100%; 
+      height: 350px; 
+      background: #fff; 
+      padding: 20px; 
+      border-radius: 8px; 
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+      animation: slideIn 1s ease-out;
+      margin-bottom: 20px;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(-50px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    #totalValue {
+      transition: color 0.5s, transform 0.5s;
+    }
+    #totalValue.updated {
+      color: #28a745;
+      transform: scale(1.1);
+    }
+    footer {
+      text-align: center;
+      font-size: 0.9em;
+      color: #666;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Stock Portfolio Tracker</h1>
+    <h2>Total Portfolio Value: ₹<span id="totalValue">0.00</span></h2>
+
+    <div class="input-section">
+      <input type="text" id="tickerInput" placeholder="Enter Ticker (e.g., AAPL)">
+      <input type="number" id="quantityInput" placeholder="Quantity" min="1">
+      <input type="number" id="buyPriceInput" placeholder="Buy Price" step="0.01">
+      <button onclick="addStockToPortfolio()">Add Stock</button>
+    </div>
+
+    <div class="portfolio-section">
+      <h2>Your Portfolio</h2>
+      <div id="portfolioContainer"></div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="priceChart"></canvas>
+    </div>
+  </div>
+
+  <footer>
+    &copy; 2025 Stock Portfolio Tracker. All rights reserved.
+  </footer>
+
+  <script>
+    let stockPrices = {};
+    let chart;
+
+    async function addStockToPortfolio() {
+      const ticker = document.getElementById("tickerInput").value.toUpperCase().trim();
+      const quantity = document.getElementById("quantityInput").value;
+      const buyPrice = document.getElementById("buyPriceInput").value;
+
+      if (!ticker || !quantity || !buyPrice) {
+        alert("Please fill all fields");
+        return;
+      }
+
+      const response = await fetch("http://127.0.0.1:5000/api/portfolio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker, quantity, buy_price: buyPrice })
+      });
+
+      if (response.ok) {
+        await loadPortfolio();
+      }
+    }
+
+    async function loadPortfolio() {
+      const response = await fetch("http://127.0.0.1:5000/api/portfolio");
+      const data = await response.json();
+      const container = document.getElementById("portfolioContainer");
+      const totalValueElement = document.getElementById("totalValue");
+      container.innerHTML = "";
+      let totalValue = 0;
+
+      if (data.portfolio && Object.keys(data.portfolio).length > 0) {
+        for (const [ticker, info] of Object.entries(data.portfolio)) {
+          totalValue += info.current_value;
+
+          const card = document.createElement("div");
+          card.className = "stock-card";
+          card.innerHTML = `
+            <h3>${ticker}</h3>
+            <p>Quantity: ${info.quantity}</p>
+            <p>Buy Price: ₹${info.buy_price}</p>
+            <p>Current Price: ₹${info.current_price}</p>
+            <p><strong>Gain/Loss: ₹${info.gain_loss}</strong></p>
+            <button class="remove-btn" onclick="removeStock('${ticker}')">Remove</button>
+          `;
+          container.appendChild(card);
+          stockPrices[ticker] = info.current_price;
+        }
+      }
+
+      totalValueElement.innerText = totalValue.toFixed(2);
+      totalValueElement.classList.add("updated");
+      setTimeout(() => totalValueElement.classList.remove("updated"), 500);
+
+      updateChart();
+    }
+
+    async function removeStock(ticker) {
+      const response = await fetch(`http://127.0.0.1:5000/api/portfolio/${ticker}`, {
+        method: "DELETE"
+      });
+
+      if (response.ok) {
+        await loadPortfolio();
+      } else {
+        alert("Failed to remove stock.");
+      }
+    }
+
+    function updateChart() {
+      if (!chart) {
+        const ctx = document.getElementById("priceChart").getContext("2d");
+        chart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: []
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { type: "time", time: { unit: "second" } },
+              y: { beginAtZero: false }
+            }
+          }
+        });
+      }
+
+      const now = new Date();
+      Object.keys(stockPrices).forEach(ticker => {
+        let dataset = chart.data.datasets.find(ds => ds.label === ticker);
+        if (!dataset) {
+          dataset = {
+            label: ticker,
+            data: [],
+            borderColor: getRandomColor(),
+            borderWidth: 2,
+            fill: false
+          };
+          chart.data.datasets.push(dataset);
+        }
+        dataset.data.push({ x: now, y: stockPrices[ticker] });
+      });
+
+      chart.data.labels.push(now);
+      chart.update();
+    }
+
+    function getRandomColor() {
+      return `hsl(${Math.floor(Math.random() * 360)}, 100%, 50%)`;
+    }
+
+    setInterval(loadPortfolio, 15000);
+    loadPortfolio();
+  </script>
+</body>
+</html>
