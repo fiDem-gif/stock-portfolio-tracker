@@ -28,7 +28,7 @@ An intuitive and elegant web app to track your stock investments in real-time. B
 
 ### 1. Clone the repo
 bash
-git clone [https://github.com/Njordlord/stock-portfolio-tracker.git](https://github.com/fiDem-gif/stock-portfolio-tracker)
+git clone (https://github.com/fiDem-gif/stock-portfolio-tracker)
 cd stock-portfolio-tracker
 
 
